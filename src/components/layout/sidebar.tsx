@@ -12,6 +12,7 @@ import {
   Settings,
   LogOut,
   ChevronRight,
+  BookOpen,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
@@ -27,38 +28,57 @@ const navItems = [
     href: "/intent",
     label: "エッセンシャル・インテント",
     icon: Target,
-    description: "最重要目標",
+    description: "最重要目標（第10章）",
   },
   {
     href: "/daily-focus",
     label: "デイリーフォーカス",
     icon: Focus,
-    description: "今日の本質",
+    description: "今日の本質（第19章）",
   },
   {
     href: "/commitments",
     label: "90点判定",
     icon: Shield,
-    description: "依頼の評価",
+    description: "依頼の評価（第9章）",
   },
   {
     href: "/habits",
     label: "習慣エッセンシャル診断",
     icon: CalendarDays,
-    description: "Notion連携分析",
+    description: "Notion連携分析（第18章）",
   },
   {
     href: "/weekly-review",
     label: "ウィークリーレビュー",
     icon: CalendarDays,
-    description: "AIと振り返り",
+    description: "AIと振り返り（第6章）",
   },
+  {
+    href: "/book",
+    label: "書籍ガイド",
+    icon: BookOpen,
+    description: "全章解説・機能マッピング",
+  },
+];
+
+// Rotating essential questions from the book
+const ESSENTIAL_QUESTIONS = [
+  "今、何が最も重要ですか？",
+  "絶対にYESと言い切れますか？",
+  "これを捨てたら何が生まれますか？",
+  "誰かに頼まれたからではなく、本当にやりたいですか？",
+  "これをすると、何を手放しますか？",
+  "今日始めるとしたら、やるだろうか？",
 ];
 
 export function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const supabase = createClient();
+
+  const questionIndex = new Date().getDate() % ESSENTIAL_QUESTIONS.length;
+  const todayQuestion = ESSENTIAL_QUESTIONS[questionIndex];
 
   async function handleSignOut() {
     await supabase.auth.signOut();
@@ -68,22 +88,32 @@ export function Sidebar() {
   return (
     <aside className="w-64 h-screen bg-white border-r border-stone-100 flex flex-col fixed left-0 top-0 z-40">
       {/* Logo */}
-      <div className="px-6 py-5 border-b border-stone-100">
+      <div className="px-6 py-4 border-b border-stone-100">
         <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg bg-stone-900 flex items-center justify-center">
+          <div className="w-7 h-7 rounded-lg bg-stone-900 flex items-center justify-center">
             <span className="text-white text-xs font-bold">E</span>
           </div>
           <div>
             <p className="font-bold text-stone-900 text-sm leading-tight">
               essentia
             </p>
-            <p className="text-xs text-stone-400">より少なく、しかしより良く</p>
+            <p className="text-[10px] text-stone-400">より少なく、しかしより良く</p>
           </div>
         </div>
       </div>
 
+      {/* Daily essential question — 第19章：集中 */}
+      <div className="mx-3 mt-3 bg-stone-50 rounded-xl px-3 py-2.5 border border-stone-100">
+        <p className="text-[10px] text-stone-400 font-medium mb-1">
+          今日の問いかけ（第19章：集中）
+        </p>
+        <p className="text-xs text-stone-700 font-medium leading-snug">
+          {todayQuestion}
+        </p>
+      </div>
+
       {/* Navigation */}
-      <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
+      <nav className="flex-1 px-3 py-3 space-y-0.5 overflow-y-auto">
         {navItems.map((item) => {
           const Icon = item.icon;
           const isActive = pathname === item.href;
@@ -92,7 +122,7 @@ export function Sidebar() {
               key={item.href}
               href={item.href}
               className={cn(
-                "flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-all duration-150 group",
+                "flex items-center gap-3 px-3 py-2 rounded-xl text-sm transition-all duration-150 group",
                 isActive
                   ? "bg-stone-900 text-white"
                   : "text-stone-600 hover:bg-stone-50 hover:text-stone-900"
@@ -105,10 +135,10 @@ export function Sidebar() {
                 )}
               />
               <div className="flex-1 min-w-0">
-                <p className="font-medium leading-tight truncate">{item.label}</p>
+                <p className="font-medium leading-tight truncate text-xs">{item.label}</p>
                 <p
                   className={cn(
-                    "text-xs truncate mt-0.5",
+                    "text-[10px] truncate mt-0.5",
                     isActive ? "text-stone-300" : "text-stone-400"
                   )}
                 >
@@ -116,7 +146,7 @@ export function Sidebar() {
                 </p>
               </div>
               {isActive && (
-                <ChevronRight className="w-3.5 h-3.5 text-stone-400 flex-shrink-0" />
+                <ChevronRight className="w-3 h-3 text-stone-400 flex-shrink-0" />
               )}
             </Link>
           );
@@ -124,23 +154,23 @@ export function Sidebar() {
       </nav>
 
       {/* Bottom */}
-      <div className="px-3 py-4 border-t border-stone-100 space-y-1">
+      <div className="px-3 py-3 border-t border-stone-100 space-y-0.5">
         <Link
           href="/settings"
           className={cn(
-            "flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-stone-600 hover:bg-stone-50 hover:text-stone-900 transition-all duration-150",
+            "flex items-center gap-3 px-3 py-2 rounded-xl text-sm text-stone-600 hover:bg-stone-50 hover:text-stone-900 transition-all duration-150",
             pathname === "/settings" && "bg-stone-900 text-white"
           )}
         >
           <Settings className="w-4 h-4 flex-shrink-0 text-stone-400" />
-          <span className="font-medium">設定</span>
+          <span className="font-medium text-xs">設定</span>
         </Link>
         <button
           onClick={handleSignOut}
-          className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-stone-600 hover:bg-red-50 hover:text-red-700 transition-all duration-150 w-full"
+          className="flex items-center gap-3 px-3 py-2 rounded-xl text-sm text-stone-600 hover:bg-red-50 hover:text-red-700 transition-all duration-150 w-full"
         >
           <LogOut className="w-4 h-4 flex-shrink-0 text-stone-400" />
-          <span className="font-medium">ログアウト</span>
+          <span className="font-medium text-xs">ログアウト</span>
         </button>
       </div>
     </aside>

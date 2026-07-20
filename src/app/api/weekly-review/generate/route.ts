@@ -12,7 +12,7 @@ export async function POST(request: NextRequest) {
 
   const { weekStart, weekEnd, activeIntent } = await request.json();
 
-  // Fetch daily focus for the week
+  // Fetch this week's daily focus
   const { data: weekFocus } = await supabase
     .from("daily_focus")
     .select("*")
@@ -20,15 +20,28 @@ export async function POST(request: NextRequest) {
     .gte("date", weekStart)
     .lte("date", weekEnd);
 
-  // Fetch commitments from this week
+  // Fetch commitments evaluated this week
   const { data: weekCommitments } = await supabase
     .from("commitments")
-    .select("title, score, status")
+    .select("title, score, status, ai_verdict")
     .eq("user_id", user.id)
     .gte("created_at", weekStart)
     .lte("created_at", weekEnd + "T23:59:59");
 
-  const focusSummary = weekFocus
+  // Fetch last 3 weekly reviews to detect repeating patterns
+  const { data: recentReviews } = await supabase
+    .from("weekly_reviews")
+    .select("time_thief, week_start")
+    .eq("user_id", user.id)
+    .order("week_start", { ascending: false })
+    .limit(3);
+
+  const completedFocus = weekFocus?.filter((f) => f.completed) ?? [];
+  const completionRate = weekFocus?.length
+    ? Math.round((completedFocus.length / weekFocus.length) * 100)
+    : 0;
+
+  const focusSummary = weekFocus?.length
     ? weekFocus
         .map(
           (f) =>
@@ -37,28 +50,41 @@ export async function POST(request: NextRequest) {
         .join("\n")
     : "記録なし";
 
-  const commitmentSummary = weekCommitments
+  const commitmentSummary = weekCommitments?.length
     ? weekCommitments
-        .map((c) => `${c.title}（${c.score}点 → ${c.status}）`)
+        .map(
+          (c: { title: string; score: number | null; status: string }) =>
+            `・${c.title}（${c.score !== null ? c.score + "点" : "評価なし"} → ${c.status === "accepted" ? "引き受け" : "断った"}）`
+        )
         .join("\n")
-    : "評価なし";
+    : "なし";
 
-  const prompt = `今週（${weekStart}〜${weekEnd}）のウィークリーレビューサマリーを生成してください。
+  const repeatingTimeThieves = recentReviews
+    ?.map((r: { time_thief: string | null }) => r.time_thief)
+    .filter(Boolean) ?? [];
 
-${activeIntent ? `インテント：「${activeIntent.title}」` : ""}
+  const prompt = `今週（${weekStart}〜${weekEnd}）のウィークリーレビュー（第6章：洞察）を実施します。
 
-今週のデイリーフォーカス：
+━━━ ユーザーのコンテキスト ━━━
+インテント（第10章）：「${activeIntent?.title || "未設定"}」
+
+今週のデイリーフォーカス達成率（第19章）：${weekFocus?.length ? `${weekFocus.length}日中${completedFocus.length}日完了（${completionRate}%）` : "記録なし"}
 ${focusSummary}
 
-今週評価した依頼：
+今週評価した依頼（第9章）：
 ${commitmentSummary}
 
-以下の観点でサマリーを書いてください：
-1. 今週インテントにどれだけ近づけたか
-2. デイリーフォーカスの達成率
-3. 来週に向けた1つの提案
+━━━ 過去のパターン（第16章：削減）━━━
+直近の「時間を奪ったもの」：${repeatingTimeThieves.length ? repeatingTimeThieves.join("、") : "初回レビュー"}
 
-温かみのある口調で、300文字以内で。`;
+━━━ 指示 ━━━
+エッセンシャル思考の観点で、今週のサマリーを書いてください：
+1. インテントへの前進度（第17章：前進）
+2. デイリーフォーカス達成のパターンに気づいたことがあれば
+3. 「捨てるべきコミットメント（第12章：キャンセル）」のヒント
+4. 来週に向けた1つのエッセンシャルアクション提案
+
+温かみのある口調で、350文字以内で。最後に「来週のエッセンシャルアクション：〇〇」という形で締めてください。`;
 
   const stream = await openai.chat.completions.create({
     model: "gpt-4o",
@@ -68,7 +94,7 @@ ${commitmentSummary}
     ],
     stream: true,
     temperature: 0.7,
-    max_tokens: 400,
+    max_tokens: 500,
   });
 
   const encoder = new TextEncoder();

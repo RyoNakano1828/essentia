@@ -12,19 +12,20 @@ export async function POST(request: NextRequest) {
 
   const { title, description, periodType } = await request.json();
 
-  const prompt = `ユーザーが以下のエッセンシャル・インテント（最重要目標）を設定しようとしています：
+  const prompt = `ユーザーが以下のエッセンシャル・インテント（第10章：目標）を設定しようとしています：
 
 インテント：「${title}」
 期間：${periodType === "quarterly" ? "四半期" : "年間"}
 理由：${description || "（未記入）"}
 
-このインテントについて、以下の観点からフィードバックをください：
-1. 具体性：「勇気が出るほど具体的」かどうか
-2. 本質性：本当にこれが最重要かどうかを問い返す
-3. 測定可能性：達成したかどうかわかるか
-4. 改善提案：より良い表現があれば1つだけ提案
+以下のエッセンシャル思考の観点でフィードバックをください：
 
-温かみのある口調で、200文字以内で簡潔に。`;
+1. **孤独（第5章）**：本当に自分が主体的に選んだ目標ですか？誰かへの義務感や外的プレッシャーから来ていませんか？
+2. **選抜（第9章・90点ルール）**：「絶対にYESと言い切れますか？」90点未満なら再考の余地があります。
+3. **目標（第10章）**：「感動的なほど具体的で、意味深い」インテントになっていますか？「○○を向上させる」ではなく「○ヶ月で○○を達成する」のように。
+4. **改善提案**：より本質的で具体的な表現があれば1つだけ提案する。
+
+温かみのある口調で、250文字以内で簡潔に。`;
 
   const stream = await openai.chat.completions.create({
     model: "gpt-4o",
@@ -34,7 +35,7 @@ export async function POST(request: NextRequest) {
     ],
     stream: true,
     temperature: 0.7,
-    max_tokens: 300,
+    max_tokens: 350,
   });
 
   const encoder = new TextEncoder();
