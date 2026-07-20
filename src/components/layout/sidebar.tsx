@@ -7,7 +7,7 @@ import {
   Target,
   Sparkles,
   Shield,
-  CalendarDays,
+  CalendarCheck,
   Focus,
   Settings,
   LogOut,
@@ -22,7 +22,7 @@ const navItems = [
     href: "/dashboard",
     label: "ダッシュボード",
     icon: Sparkles,
-    description: "全体サマリー",
+    description: "今日のまとめ",
   },
   {
     href: "/intent",
@@ -37,37 +37,30 @@ const navItems = [
     description: "今日の本質（第19章）",
   },
   {
+    href: "/habits",
+    label: "習慣トラッカー",
+    icon: CalendarCheck,
+    description: "毎日チェック（第18章）",
+  },
+  {
     href: "/commitments",
     label: "90点判定",
     icon: Shield,
     description: "依頼の評価（第9章）",
   },
   {
-    href: "/habits",
-    label: "習慣エッセンシャル診断",
-    icon: CalendarDays,
-    description: "Notion連携分析（第18章）",
-  },
-  {
-    href: "/weekly-review",
-    label: "ウィークリーレビュー",
-    icon: CalendarDays,
-    description: "AIと振り返り（第6章）",
-  },
-  {
     href: "/book",
     label: "書籍ガイド",
     icon: BookOpen,
-    description: "全章解説・機能マッピング",
+    description: "全章解説",
   },
 ];
 
-// Rotating essential questions from the book
 const ESSENTIAL_QUESTIONS = [
   "今、何が最も重要ですか？",
   "絶対にYESと言い切れますか？",
   "これを捨てたら何が生まれますか？",
-  "誰かに頼まれたからではなく、本当にやりたいですか？",
+  "本当にやりたいですか？",
   "これをすると、何を手放しますか？",
   "今日始めるとしたら、やるだろうか？",
 ];
@@ -94,22 +87,16 @@ export function Sidebar() {
             <span className="text-white text-xs font-bold">E</span>
           </div>
           <div>
-            <p className="font-bold text-stone-900 text-sm leading-tight">
-              essentia
-            </p>
+            <p className="font-bold text-stone-900 text-sm leading-tight">essentia</p>
             <p className="text-[10px] text-stone-400">より少なく、しかしより良く</p>
           </div>
         </div>
       </div>
 
-      {/* Daily essential question — 第19章：集中 */}
+      {/* Daily question (第19章：集中) */}
       <div className="mx-3 mt-3 bg-stone-50 rounded-xl px-3 py-2.5 border border-stone-100">
-        <p className="text-[10px] text-stone-400 font-medium mb-1">
-          今日の問いかけ（第19章：集中）
-        </p>
-        <p className="text-xs text-stone-700 font-medium leading-snug">
-          {todayQuestion}
-        </p>
+        <p className="text-[10px] text-stone-400 font-medium mb-0.5">今日の問い（第19章）</p>
+        <p className="text-xs text-stone-700 font-medium leading-snug">{todayQuestion}</p>
       </div>
 
       {/* Navigation */}
@@ -136,18 +123,11 @@ export function Sidebar() {
               />
               <div className="flex-1 min-w-0">
                 <p className="font-medium leading-tight truncate text-xs">{item.label}</p>
-                <p
-                  className={cn(
-                    "text-[10px] truncate mt-0.5",
-                    isActive ? "text-stone-300" : "text-stone-400"
-                  )}
-                >
+                <p className={cn("text-[10px] truncate mt-0.5", isActive ? "text-stone-300" : "text-stone-400")}>
                   {item.description}
                 </p>
               </div>
-              {isActive && (
-                <ChevronRight className="w-3 h-3 text-stone-400 flex-shrink-0" />
-              )}
+              {isActive && <ChevronRight className="w-3 h-3 text-stone-400 flex-shrink-0" />}
             </Link>
           );
         })}

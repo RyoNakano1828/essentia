@@ -12,17 +12,33 @@ export interface EssentialIntent {
   updated_at: string;
 }
 
-export interface Habit {
+export interface HabitTemplate {
   id: string;
   user_id: string;
   name: string;
-  description: string | null;
-  category: string | null;
-  is_essential: boolean;
-  notion_db_name: string | null;
-  ai_analysis: string | null;
+  category: string;
+  icon: string;
+  is_active: boolean;
+  sort_order: number;
   created_at: string;
   updated_at: string;
+}
+
+export interface HabitLog {
+  id: string;
+  user_id: string;
+  habit_id: string;
+  date: string;
+  done: boolean;
+  note: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface HabitWithStreak extends HabitTemplate {
+  streak: number;
+  done_today: boolean;
+  log_id: string | null;
 }
 
 export interface Commitment {
@@ -43,22 +59,6 @@ export interface Commitment {
   updated_at: string;
 }
 
-export interface WeeklyReview {
-  id: string;
-  user_id: string;
-  week_start: string;
-  week_end: string;
-  ai_summary: string | null;
-  key_achievement: string | null;
-  time_thief: string | null;
-  commitments_to_drop: string | null;
-  essential_action_next_week: string | null;
-  pattern_warning: string | null;
-  notion_data: Record<string, unknown> | null;
-  created_at: string;
-  updated_at: string;
-}
-
 export interface DailyFocus {
   id: string;
   user_id: string;
@@ -67,17 +67,37 @@ export interface DailyFocus {
   ai_suggestion: string | null;
   completed: boolean;
   reflection: string | null;
+  perma_positive: number | null;
+  perma_meaning: number | null;
+  perma_achieve: number | null;
+  habits_checked: boolean;
   created_at: string;
   updated_at: string;
 }
 
-export interface NotionDatabaseInfo {
-  id: string;
-  name: string;
-  last_edited: string;
+export interface WeeklySummary {
+  week_start: string;
+  week_end: string;
+  focus_completion_rate: number;
+  top_habits: { name: string; icon: string; streak: number }[];
+  avg_perma_meaning: number | null;
+  ai_summary: string;
+  essential_action: string;
 }
 
 export interface AIMessage {
   role: "user" | "assistant" | "system";
   content: string;
 }
+
+// Default habit seeds for new users
+export const DEFAULT_HABITS: Omit<HabitTemplate, "id" | "user_id" | "created_at" | "updated_at">[] = [
+  { name: "キックボクシング", category: "運動", icon: "🥊", is_active: true, sort_order: 1 },
+  { name: "ストレッチ",       category: "運動", icon: "🧘", is_active: true, sort_order: 2 },
+  { name: "英語学習",         category: "学習", icon: "📚", is_active: true, sort_order: 3 },
+  { name: "睡眠記録",         category: "健康", icon: "😴", is_active: true, sort_order: 4 },
+  { name: "食事記録",         category: "食事", icon: "🍽️", is_active: true, sort_order: 5 },
+  { name: "体重記録",         category: "健康", icon: "⚖️", is_active: true, sort_order: 6 },
+  { name: "家事",             category: "生活", icon: "🏠", is_active: true, sort_order: 7 },
+  { name: "家計記録",         category: "生活", icon: "💰", is_active: true, sort_order: 8 },
+];

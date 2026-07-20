@@ -1,52 +1,38 @@
 "use client";
 
 import { useState } from "react";
-import { Settings, Check, ExternalLink } from "lucide-react";
+import { Settings, Check } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 
 interface SettingsClientProps {
-  settings: {
-    notion_access_token?: string | null;
-    notion_workspace_name?: string | null;
-  } | null;
   userEmail: string;
+  hasHabits: boolean;
 }
 
-export function SettingsClient({ settings, userEmail }: SettingsClientProps) {
-  const [notionToken, setNotionToken] = useState(settings?.notion_access_token ?? "");
-  const [notionWorkspace, setNotionWorkspace] = useState(settings?.notion_workspace_name ?? "");
-  const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
+export function SettingsClient({ userEmail, hasHabits }: SettingsClientProps) {
+  const [seeding, setSeeding] = useState(false);
+  const [seedDone, setSeedDone] = useState(false);
 
-  async function handleSave() {
-    setSaving(true);
-    const response = await fetch("/api/settings", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        notion_access_token: notionToken,
-        notion_workspace_name: notionWorkspace,
-      }),
-    });
-
-    if (response.ok) {
-      setSaved(true);
-      setTimeout(() => setSaved(false), 3000);
+  async function handleSeedHabits() {
+    setSeeding(true);
+    const res = await fetch("/api/habits/seed", { method: "POST" });
+    if (res.ok) {
+      const data = await res.json();
+      setSeedDone(data.seeded);
     }
-    setSaving(false);
+    setSeeding(false);
   }
 
   return (
     <div className="space-y-6 max-w-2xl">
       <div>
         <h1 className="text-2xl font-bold text-stone-900">設定</h1>
-        <p className="text-stone-500 mt-1 text-sm">アカウントと連携の設定</p>
+        <p className="text-stone-500 mt-1 text-sm">アカウントの設定</p>
       </div>
 
-      {/* Account info */}
+      {/* Account */}
       <Card>
         <CardHeader>
           <CardTitle className="text-base">アカウント</CardTitle>
@@ -64,82 +50,51 @@ export function SettingsClient({ settings, userEmail }: SettingsClientProps) {
         </CardContent>
       </Card>
 
-      {/* Notion integration */}
+      {/* Habit seed */}
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
             <div>
-              <CardTitle className="text-base">Notion連携</CardTitle>
+              <CardTitle className="text-base">デフォルト習慣を追加</CardTitle>
               <CardDescription>
-                習慣診断とウィークリーレビューでNotionデータを分析するために使用します
+                Notionの12DBに対応した習慣8項目を一括追加します
               </CardDescription>
             </div>
-            {settings?.notion_access_token && (
-              <Badge variant="essential">
-                <Check className="w-3 h-3 mr-1" />
-                接続済み
-              </Badge>
+            {hasHabits && (
+              <Badge variant="muted">追加済み</Badge>
             )}
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="bg-stone-50 rounded-xl p-4 text-sm text-stone-600 leading-relaxed">
-            <p className="font-medium text-stone-700 mb-2">
-              Notion Integration Tokenの取得方法
-            </p>
-            <ol className="space-y-1.5 list-decimal list-inside text-stone-500">
-              <li>
-                <a
-                  href="https://www.notion.so/my-integrations"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-stone-700 underline inline-flex items-center gap-0.5"
-                >
-                  notion.so/my-integrations
-                  <ExternalLink className="w-3 h-3" />
-                </a>{" "}
-                を開く
-              </li>
-              <li>「新しいインテグレーション」を作成</li>
-              <li>「内部インテグレーション トークン」をコピー</li>
-              <li>分析したいNotionデータベースをインテグレーションと共有</li>
-            </ol>
+          <div className="bg-stone-50 rounded-xl p-4">
+            <div className="grid grid-cols-2 gap-2 text-sm text-stone-600">
+              {[
+                ["🥊", "キックボクシング"],
+                ["🧘", "ストレッチ"],
+                ["📚", "英語学習"],
+                ["😴", "睡眠記録"],
+                ["🍽️", "食事記録"],
+                ["⚖️", "体重記録"],
+                ["🏠", "家事"],
+                ["💰", "家計記録"],
+              ].map(([icon, name]) => (
+                <div key={name} className="flex items-center gap-2">
+                  <span>{icon}</span>
+                  <span>{name}</span>
+                </div>
+              ))}
+            </div>
           </div>
-
-          <div>
-            <label className="block text-sm font-medium text-stone-700 mb-1.5">
-              Notion Integration Token
-            </label>
-            <Input
-              type="password"
-              placeholder="secret_xxxxxxxxxxxx"
-              value={notionToken}
-              onChange={(e) => setNotionToken(e.target.value)}
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-stone-700 mb-1.5">
-              ワークスペース名（任意）
-            </label>
-            <Input
-              placeholder="例：AI-Readyな自分づくり"
-              value={notionWorkspace}
-              onChange={(e) => setNotionWorkspace(e.target.value)}
-            />
-          </div>
-
-          <Button onClick={handleSave} loading={saving}>
-            {saved ? (
-              <>
-                <Check className="w-4 h-4" />
-                保存しました
-              </>
+          <Button
+            onClick={handleSeedHabits}
+            loading={seeding}
+            disabled={hasHabits || seedDone}
+            variant={hasHabits || seedDone ? "secondary" : "primary"}
+          >
+            {hasHabits || seedDone ? (
+              <><Check className="w-4 h-4" />追加済みです</>
             ) : (
-              <>
-                <Settings className="w-4 h-4" />
-                設定を保存する
-              </>
+              <><Settings className="w-4 h-4" />デフォルト習慣を追加する</>
             )}
           </Button>
         </CardContent>
@@ -150,13 +105,9 @@ export function SettingsClient({ settings, userEmail }: SettingsClientProps) {
         <CardHeader>
           <CardTitle className="text-base">essentia について</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-2 text-sm text-stone-500">
-          <p>
-            グレッグ・マキューン著『エッセンシャル思考 最少の時間で成果を最大にする』に基づくパーソナルAIコーチ。
-          </p>
-          <p className="italic text-stone-400">
-            「より少なく、しかしより良く」
-          </p>
+        <CardContent className="text-sm text-stone-500 space-y-2">
+          <p>グレッグ・マキューン著『エッセンシャル思考』に基づくパーソナルAIコーチ。</p>
+          <p className="italic text-stone-400">「より少なく、しかしより良く」</p>
         </CardContent>
       </Card>
     </div>
