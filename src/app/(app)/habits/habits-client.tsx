@@ -1,292 +1,265 @@
 "use client";
 
 import { useState } from "react";
-import { CalendarDays, Sparkles, Settings, Check } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Plus, Settings, Check, Flame } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { AIMessage } from "@/components/ui/ai-message";
-import { Habit } from "@/types";
+import { HabitWithStreak } from "@/types";
+import { formatDate } from "@/lib/utils";
 
 interface HabitsClientProps {
-  habits: Habit[];
-  hasNotionToken: boolean;
-  notionWorkspace: string | null;
+  habits: HabitWithStreak[];
+  today: string;
 }
 
-interface DiagnosisResult {
-  essential_habits: {
-    name: string;
-    reason: string;
-    notion_db: string | null;
-    is_active: boolean;
-  }[];
-  summary: string;
-  warning: string | null;
-}
+const CATEGORIES = ["運動", "学習", "健康", "食事", "生活", "その他"];
+const ICONS = ["🥊", "🧘", "📚", "😴", "🍽️", "⚖️", "🏠", "💰", "🏃", "💪", "🎯", "✍️", "🎵", "🧹", "💊"];
 
-export function HabitsClient({
-  habits: initialHabits,
-  hasNotionToken,
-  notionWorkspace,
-}: HabitsClientProps) {
+export function HabitsClient({ habits: initialHabits, today }: HabitsClientProps) {
   const [habits, setHabits] = useState(initialHabits);
-  const [diagnosing, setDiagnosing] = useState(false);
-  const [result, setResult] = useState<DiagnosisResult | null>(null);
-  const [saving, setSaving] = useState(false);
+  const [showAdd, setShowAdd] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const [newName, setNewName] = useState("");
+  const [newCategory, setNewCategory] = useState("その他");
+  const [newIcon, setNewIcon] = useState("✅");
+  const [adding, setAdding] = useState(false);
+  const [toggling, setToggling] = useState<string | null>(null);
 
-  async function handleDiagnose() {
-    setDiagnosing(true);
-    setResult(null);
+  const doneCount = habits.filter((h) => h.done_today).length;
+  const completionRate = habits.length > 0 ? Math.round((doneCount / habits.length) * 100) : 0;
 
-    const response = await fetch("/api/habits/diagnose", {
+  async function handleToggle(habit: HabitWithStreak) {
+    setToggling(habit.id);
+    const response = await fetch("/api/habits/log", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        habit_id: habit.id,
+        date: today,
+        done: !habit.done_today,
+        log_id: habit.log_id,
+      }),
     });
-
     if (response.ok) {
-      const data = await response.json();
-      setResult(data);
+      const log = await response.json();
+      setHabits((prev) =>
+        prev.map((h) =>
+          h.id === habit.id
+            ? {
+                ...h,
+                done_today: log.done,
+                log_id: log.id,
+                streak: log.done ? h.streak + (h.done_today ? 0 : 1) : Math.max(0, h.streak - 1),
+              }
+            : h
+        )
+      );
     }
-    setDiagnosing(false);
+    setToggling(null);
   }
 
-  async function handleSaveResults() {
-    if (!result) return;
-    setSaving(true);
-
-    const response = await fetch("/api/habits", {
+  async function handleAdd() {
+    if (!newName) return;
+    setAdding(true);
+    const response = await fetch("/api/habits/templates", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ habits: result.essential_habits }),
+      body: JSON.stringify({ name: newName, category: newCategory, icon: newIcon }),
     });
-
     if (response.ok) {
-      const data = await response.json();
-      setHabits(data);
-      setResult(null);
+      const habit = await response.json();
+      setHabits((prev) => [...prev, { ...habit, streak: 0, done_today: false, log_id: null }]);
+      setNewName("");
+      setShowAdd(false);
     }
-    setSaving(false);
+    setAdding(false);
   }
 
-  const essentialHabits = habits.filter((h) => h.is_essential);
-  const otherHabits = habits.filter((h) => !h.is_essential);
+  async function handleDeactivate(id: string) {
+    await fetch(`/api/habits/templates/${id}`, { method: "DELETE" });
+    setHabits((prev) => prev.filter((h) => h.id !== id));
+  }
+
+  const byCategory = CATEGORIES.reduce<Record<string, HabitWithStreak[]>>((acc, cat) => {
+    const items = habits.filter((h) => h.category === cat);
+    if (items.length > 0) acc[cat] = items;
+    return acc;
+  }, {});
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-stone-900">習慣エッセンシャル診断</h1>
-        <p className="text-stone-500 mt-1 text-sm">
-          Notionデータを分析し、本当に守るべき習慣をAIが特定します。
-        </p>
+      {/* Header */}
+      <div className="flex items-start justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-stone-900">習慣トラッカー</h1>
+          <p className="text-stone-500 mt-1 text-sm">
+            {formatDate(today)} — 今日の習慣をチェックしましょう
+          </p>
+        </div>
+        <div className="flex gap-2">
+          <Button variant="ghost" size="sm" onClick={() => setShowSettings(!showSettings)}>
+            <Settings className="w-4 h-4" />
+          </Button>
+          <Button size="sm" onClick={() => setShowAdd(!showAdd)}>
+            <Plus className="w-4 h-4" />
+            追加
+          </Button>
+        </div>
       </div>
 
-      {/* Notion connection status */}
-      <Card className={hasNotionToken ? "border-emerald-200 bg-emerald-50" : ""}>
-        <CardContent className="py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div
-                className={`w-8 h-8 rounded-lg flex items-center justify-center ${
-                  hasNotionToken ? "bg-emerald-100" : "bg-stone-100"
-                }`}
-              >
-                <span className="text-base">N</span>
-              </div>
-              <div>
-                <p className="text-sm font-medium text-stone-900">
-                  Notion連携
-                </p>
-                <p className="text-xs text-stone-500">
-                  {hasNotionToken
-                    ? `接続済み${notionWorkspace ? ` — ${notionWorkspace}` : ""}`
-                    : "未接続"}
-                </p>
-              </div>
-            </div>
-            {hasNotionToken ? (
-              <Badge variant="essential">
-                <Check className="w-3 h-3 mr-1" />
-                接続済み
-              </Badge>
-            ) : (
-              <Button variant="outline" size="sm" onClick={() => window.location.href = "/settings"}>
-                <Settings className="w-3.5 h-3.5" />
-                設定する
-              </Button>
-            )}
+      {/* Progress ring */}
+      <div className="bg-stone-900 text-white rounded-2xl p-5 flex items-center gap-6">
+        <div className="relative w-20 h-20 flex-shrink-0">
+          <svg width="80" height="80" viewBox="0 0 80 80" className="-rotate-90">
+            <circle cx="40" cy="40" r="32" fill="none" stroke="rgba(255,255,255,0.15)" strokeWidth="7" />
+            <circle
+              cx="40" cy="40" r="32" fill="none"
+              stroke={completionRate === 100 ? "#10b981" : "white"}
+              strokeWidth="7"
+              strokeDasharray={2 * Math.PI * 32}
+              strokeDashoffset={2 * Math.PI * 32 * (1 - completionRate / 100)}
+              strokeLinecap="round"
+              className="transition-all duration-500"
+            />
+          </svg>
+          <div className="absolute inset-0 flex items-center justify-center">
+            <span className="text-xl font-bold">{completionRate}%</span>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+        <div>
+          <p className="text-stone-300 text-xs font-medium mb-1">今日の達成率</p>
+          <p className="text-2xl font-bold">
+            {doneCount} / {habits.length}
+          </p>
+          <p className="text-stone-400 text-xs mt-1">習慣完了</p>
+          {completionRate === 100 && (
+            <p className="text-emerald-400 text-sm font-medium mt-2">🎉 全習慣コンプリート！</p>
+          )}
+        </div>
+      </div>
 
-      {/* Diagnose button */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">習慣エッセンシャル診断を実行</CardTitle>
-          <CardDescription>
-            {hasNotionToken
-              ? "NotionのPERMAスコアと各習慣DBをAIがクロス分析します"
-              : "Notionと連携することで、あなたの実際のデータに基づいた診断が可能になります"}
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="bg-stone-50 rounded-xl p-4 space-y-2">
-            <p className="text-sm font-medium text-stone-700">分析内容</p>
-            <ul className="text-sm text-stone-500 space-y-1.5">
-              {[
-                "PERMAスコア × 各習慣記録のクロス分析",
-                "「この習慣をしている週は充実感が高い」を自動検出",
-                "記録が途絶えている習慣への問いかけ",
-                "守るべき習慣トップ3の提示",
-              ].map((item) => (
-                <li key={item} className="flex items-start gap-2">
-                  <span className="text-emerald-500 mt-0.5">✓</span>
-                  {item}
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          <Button
-            onClick={handleDiagnose}
-            loading={diagnosing}
-            className="w-full"
-          >
-            <Sparkles className="w-4 h-4" />
-            {hasNotionToken ? "Notionデータで診断する" : "サンプルデータで診断する"}
-          </Button>
-        </CardContent>
-      </Card>
-
-      {/* Diagnosis result */}
-      {result && (
-        <Card className="border-emerald-200">
+      {/* Add form */}
+      {showAdd && (
+        <Card>
           <CardHeader>
-            <div className="flex items-center gap-2">
-              <Sparkles className="w-4 h-4 text-emerald-600" />
-              <CardTitle className="text-base text-emerald-800">
-                診断結果
-              </CardTitle>
-            </div>
+            <CardTitle className="text-base">新しい習慣を追加</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <AIMessage content={result.summary} />
-
-            {result.warning && (
-              <div className="bg-amber-50 border border-amber-100 rounded-xl p-3">
-                <p className="text-sm text-amber-800">
-                  ⚠️ {result.warning}
-                </p>
-              </div>
-            )}
-
-            <div className="space-y-3">
-              <p className="text-sm font-medium text-stone-700">
-                守るべき習慣トップ{result.essential_habits.length}
-              </p>
-              {result.essential_habits.map((h, i) => (
-                <div
-                  key={i}
-                  className={`flex items-start gap-3 p-3 rounded-xl ${
-                    h.is_active
-                      ? "bg-emerald-50 border border-emerald-100"
-                      : "bg-stone-50 border border-stone-100"
-                  }`}
-                >
-                  <span
-                    className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${
-                      h.is_active
-                        ? "bg-emerald-500 text-white"
-                        : "bg-stone-300 text-white"
+          <CardContent className="space-y-3">
+            <div className="flex gap-2">
+              <div className="flex gap-1 flex-wrap">
+                {ICONS.map((icon) => (
+                  <button
+                    key={icon}
+                    onClick={() => setNewIcon(icon)}
+                    className={`w-8 h-8 rounded-lg text-base flex items-center justify-center transition-colors ${
+                      newIcon === icon ? "bg-stone-900 text-white" : "bg-stone-100 hover:bg-stone-200"
                     }`}
                   >
-                    {i + 1}
-                  </span>
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2">
-                      <p className="text-sm font-medium text-stone-900">
-                        {h.name}
-                      </p>
-                      {h.notion_db && (
-                        <Badge variant="muted" className="text-xs">
-                          {h.notion_db}
-                        </Badge>
-                      )}
-                      {!h.is_active && (
-                        <Badge variant="warning" className="text-xs">
-                          途絶えている
-                        </Badge>
-                      )}
-                    </div>
-                    <p className="text-xs text-stone-500 mt-1 leading-relaxed">
-                      {h.reason}
-                    </p>
-                  </div>
-                </div>
+                    {icon}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <Input
+              placeholder="習慣名（例：読書、ランニング）"
+              value={newName}
+              onChange={(e) => setNewName(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleAdd()}
+            />
+            <div className="flex gap-2 flex-wrap">
+              {CATEGORIES.map((cat) => (
+                <button
+                  key={cat}
+                  onClick={() => setNewCategory(cat)}
+                  className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                    newCategory === cat
+                      ? "bg-stone-900 text-white"
+                      : "bg-stone-100 text-stone-600 hover:bg-stone-200"
+                  }`}
+                >
+                  {cat}
+                </button>
               ))}
             </div>
-
-            <Button onClick={handleSaveResults} loading={saving} className="w-full">
-              <Check className="w-4 h-4" />
-              この診断結果を保存する
-            </Button>
+            <div className="flex gap-2">
+              <Button onClick={handleAdd} loading={adding} disabled={!newName} className="flex-1">
+                <Plus className="w-4 h-4" />
+                追加する
+              </Button>
+              <Button variant="ghost" onClick={() => setShowAdd(false)}>キャンセル</Button>
+            </div>
           </CardContent>
         </Card>
       )}
 
-      {/* Existing essential habits */}
-      {essentialHabits.length > 0 && (
-        <div>
-          <h2 className="text-sm font-medium text-stone-700 mb-3">
-            本質的な習慣
-          </h2>
+      {/* Habits by category */}
+      {Object.entries(byCategory).map(([category, items]) => (
+        <div key={category}>
+          <p className="text-xs font-semibold text-stone-400 uppercase tracking-widest mb-2">
+            {category}
+          </p>
           <div className="space-y-2">
-            {essentialHabits.map((habit) => (
-              <div
+            {items.map((habit) => (
+              <button
                 key={habit.id}
-                className="flex items-center gap-3 p-3 bg-white rounded-xl border border-stone-100"
+                onClick={() => !toggling && handleToggle(habit)}
+                disabled={!!toggling}
+                className={`w-full flex items-center gap-4 p-4 rounded-2xl border transition-all text-left ${
+                  habit.done_today
+                    ? "bg-stone-900 border-stone-900 text-white"
+                    : "bg-white border-stone-100 hover:border-stone-200 hover:shadow-sm"
+                }`}
               >
-                <div className="w-2 h-2 rounded-full bg-emerald-400 flex-shrink-0" />
-                <div className="flex-1">
-                  <p className="text-sm font-medium text-stone-900">
+                <span className="text-2xl flex-shrink-0">{habit.icon}</span>
+                <div className="flex-1 min-w-0">
+                  <p className={`font-semibold text-sm ${habit.done_today ? "text-white" : "text-stone-900"}`}>
                     {habit.name}
                   </p>
-                  {habit.notion_db_name && (
-                    <p className="text-xs text-stone-400">{habit.notion_db_name}</p>
+                  {habit.streak > 0 && (
+                    <div className="flex items-center gap-1 mt-0.5">
+                      <Flame className={`w-3 h-3 ${habit.done_today ? "text-orange-300" : "text-orange-400"}`} />
+                      <span className={`text-xs font-medium ${habit.done_today ? "text-stone-300" : "text-stone-500"}`}>
+                        {habit.streak}日連続
+                      </span>
+                    </div>
                   )}
                 </div>
-                <Badge variant="essential">本質的</Badge>
-              </div>
+                <div className={`w-7 h-7 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all ${
+                  habit.done_today
+                    ? "bg-white border-white"
+                    : "border-stone-200"
+                }`}>
+                  {habit.done_today && <Check className="w-4 h-4 text-stone-900" />}
+                </div>
+
+                {/* Settings mode: delete button */}
+                {showSettings && (
+                  <button
+                    onClick={(e) => { e.stopPropagation(); handleDeactivate(habit.id); }}
+                    className="ml-2 text-xs text-red-400 hover:text-red-600 flex-shrink-0"
+                  >
+                    削除
+                  </button>
+                )}
+              </button>
             ))}
           </div>
         </div>
-      )}
+      ))}
 
-      {otherHabits.length > 0 && (
-        <div>
-          <h2 className="text-sm font-medium text-stone-500 mb-3">
-            その他の習慣
-          </h2>
-          <div className="space-y-2">
-            {otherHabits.map((habit) => (
-              <div
-                key={habit.id}
-                className="flex items-center gap-3 p-3 bg-white rounded-xl border border-stone-100 opacity-60"
-              >
-                <div className="w-2 h-2 rounded-full bg-stone-300 flex-shrink-0" />
-                <p className="text-sm text-stone-600">{habit.name}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {habits.length === 0 && !result && (
-        <div className="text-center py-12">
-          <CalendarDays className="w-12 h-12 text-stone-300 mx-auto mb-4" />
-          <p className="text-sm text-stone-500">
-            まだ診断結果がありません。上のボタンから診断を実行してください。
+      {habits.length === 0 && !showAdd && (
+        <div className="text-center py-16">
+          <p className="text-4xl mb-4">🎯</p>
+          <h3 className="font-semibold text-stone-900 mb-2">習慣をまだ設定していません</h3>
+          <p className="text-sm text-stone-500 mb-6 max-w-xs mx-auto">
+            エッセンシャルな習慣を追加しましょう。「守るべき本質的なもの」だけを選んでください。
           </p>
+          <Button onClick={() => setShowAdd(true)}>
+            <Plus className="w-4 h-4" />
+            最初の習慣を追加する
+          </Button>
         </div>
       )}
     </div>
