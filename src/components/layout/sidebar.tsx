@@ -13,6 +13,7 @@ import {
   LogOut,
   ChevronRight,
   BookOpen,
+  ArrowUpFromLine,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
@@ -135,6 +136,16 @@ export function Sidebar() {
 
       {/* Bottom */}
       <div className="px-3 py-3 border-t border-stone-100 space-y-0.5">
+        <Link
+          href="/migrate"
+          className={cn(
+            "flex items-center gap-3 px-3 py-2 rounded-xl text-sm text-stone-600 hover:bg-stone-50 hover:text-stone-900 transition-all duration-150",
+            pathname === "/migrate" && "bg-stone-900 text-white"
+          )}
+        >
+          <ArrowUpFromLine className="w-4 h-4 flex-shrink-0 text-stone-400" />
+          <span className="font-medium text-xs">Notionからデータ移行</span>
+        </Link>
         <Link
           href="/settings"
           className={cn(
